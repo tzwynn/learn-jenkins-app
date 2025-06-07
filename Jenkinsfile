@@ -18,8 +18,7 @@ pipeline {
             }
             steps {
                 sh '''
-                    whoami
-                    id -u
+                    chown -R node:node /var/jenkins_home/workspace/learn-jenkins-app
                     ls -la node_modules/.cache
                     ls -la
                     node --version
