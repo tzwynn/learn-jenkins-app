@@ -14,11 +14,12 @@ pipeline {
                 docker {
                     image 'node:18-alpine'
                     reuseNode true
+                    args '--user node'
                 }
             }
             steps {
                 sh '''
-                    chown -R node:node node_modules/.cache
+            
                     ls -la node_modules/.cache
                     ls -la
                     node --version
