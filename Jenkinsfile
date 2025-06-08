@@ -8,6 +8,11 @@ pipeline {
     }
 
     stages {
+        stage('Clean Workspace'){
+            steps {
+                cleanWs()
+            }
+        }
         
         stage('Build') {
             agent {
