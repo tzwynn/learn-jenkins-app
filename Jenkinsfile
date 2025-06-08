@@ -20,14 +20,6 @@ pipeline {
             }
             steps {
                 sh '''
-                    echo "Clearing NPM cache and node_modules"
-                    rm -rf /home/node/.npm
-                    rm -rf node_modules package-lock.json
-
-                    echo "Cleaning npm cache"
-                    npm cache clean --force
-
-                    npm install
                     
                     ls -la
                     node --version
