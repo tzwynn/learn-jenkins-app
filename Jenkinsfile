@@ -25,7 +25,7 @@ pipeline {
             steps {
                 sh '''
             
-                    ls -la node_modules/.cache
+                    
                     ls -la
                     node --version
                     npm --version
