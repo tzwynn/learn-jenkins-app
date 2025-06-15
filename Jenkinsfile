@@ -101,6 +101,37 @@ pipeline {
                 '''
             }
         }
+
+        stage('Prod E2E') {
+            agent {
+                docker {
+                    image 'mcr.microsoft.com/playwright:v1.39.0-jammy'
+                    reuseNode true
+                }
+            }
+
+            environment {
+
+                CI_ENVIRONMENT_URL = 'https://bejewelled-crisp-965ab1.netlify.app'
+            }
+
+            steps {
+
+                sh '''
+                    node_modules/.bin/serve -s build &
+                    sleep 10
+                    npx playwright test --reporter=html
+        
+                '''
+                
+            }
+            post {
+                always {
+                    
+                    publishHTML([allowMissing: false, alwaysLinkToLastBuild: false, icon: '', keepAll: false, reportDir: 'playwright-report', reportFiles: 'index.html', reportName: 'Playwright Post Deployment Report', reportTitles: '', useWrapperFileDirectly: true])
+                        }
+                    }
+                }    
     }
     
 }
