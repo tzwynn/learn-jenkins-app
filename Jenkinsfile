@@ -101,6 +101,12 @@ pipeline {
                 '''
             }
         }
+
+        stage('Approval') {
+            timeout(30) {
+                input cancel: 'Not approve', message: 'Would you like to Approve this deployment?', ok: 'Approve'
+            }       
+        }
         
         stage('Deploy') {
             agent {
