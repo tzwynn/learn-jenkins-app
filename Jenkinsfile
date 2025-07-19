@@ -16,6 +16,7 @@ pipeline {
                 docker {
                     image 'node:18-alpine'
                     reuseNode true
+                    args "-e REACT_APP_VERSION=${REACT_APP_VERSION}"
                 
                 }
             }
