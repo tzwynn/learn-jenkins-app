@@ -16,12 +16,13 @@ pipeline {
                 docker {
                     image 'node:18-alpine'
                     reuseNode true
+                    args "-e REACT_APP_VERSION=${REACT_APP_VERSION}"
                 
                 }
             }
             steps {
                 sh '''
-                    echo 'Small change'
+                
                     ls -la
                     node --version
                     npm --version
@@ -31,7 +32,7 @@ pipeline {
                 '''
             }
         }
-        stage('Stage Tests') {
+        stage('Tests') {
             parallel {
                 stage('Unit tests') {
                     agent {
