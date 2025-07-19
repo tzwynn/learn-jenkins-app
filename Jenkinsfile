@@ -22,13 +22,14 @@ pipeline {
             }
             steps {
                 sh '''
-                
+                    echo "Building with REACT_APP_VERSION=$REACT_APP_VERSION"
                     ls -la
                     node --version
                     npm --version
                     npm ci
                     npm run build
                     ls -la
+                    grep "Application version" build/static/js/*.js || echo "NOT EMBEDDED"
                 '''
             }
         }
