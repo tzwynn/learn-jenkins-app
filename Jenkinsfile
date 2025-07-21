@@ -16,20 +16,19 @@ pipeline {
                 docker {
                     image 'node:18-alpine'
                     reuseNode true
-                    args "-e REACT_APP_VERSION=${REACT_APP_VERSION}"
+                    //args "-e REACT_APP_VERSION=${REACT_APP_VERSION}"
                 
                 }
             }
             steps {
                 sh '''
-                    echo "Building with REACT_APP_VERSION=$REACT_APP_VERSION"
-                    ls -la
+                    
                     node --version
                     npm --version
                     npm ci
                     npm run build
                     ls -la
-                    grep "Application version" build/static/js/*.js || echo "NOT EMBEDDED"
+                    
                 '''
             }
         }
