@@ -9,6 +9,12 @@ pipeline {
     }
 
     stages {
+
+        stage('Docker'){
+            steps{
+                sh 'docker build -t my-playwright .'
+            }
+        }
        
         
         stage('Build') {
@@ -156,8 +162,8 @@ pipeline {
                     
                     publishHTML([allowMissing: false, alwaysLinkToLastBuild: false, icon: '', keepAll: false, reportDir: 'playwright-report', reportFiles: 'index.html', reportName: 'Playwright Post Deployment Report', reportTitles: '', useWrapperFileDirectly: true])
                         }
-                    }
-                }    
+                 }
+            }    
     }
     
 }
