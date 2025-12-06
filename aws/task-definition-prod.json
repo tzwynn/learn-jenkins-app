@@ -6,7 +6,7 @@
     "containerDefinitions": [
         {
             "name": "learningjenkinsapp",
-            "image": "nginx:1.27-alpine",
+            "image": "471112789164.dkr.ecr.eu-west-2.amazonaws.com/learnjenkinsapp@sha256:85fae4defd5a60c1dfe3904f06afc66bd06c787c76a1dd980ccd775599378a78",
             "portMappings": [
                 {
                     "name": "nginx-80-tcp",
@@ -22,5 +22,5 @@
     "networkMode": "awsvpc",
     "memory": "512",
     "cpu": "256",
-    "executionRoleArn": ""
+    "executionRoleArn": "arn:aws:iam::471112789164:role/ecsTaskExecutionRole"
 }

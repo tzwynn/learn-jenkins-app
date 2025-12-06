@@ -40,9 +40,21 @@ pipeline {
             steps{
                  withCredentials([usernamePassword(credentialsId: 'jenkins-user-aws', passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID')]) {
                     sh '''
-                        docker build -t $AWS_DOCKER_REGISTRY/$APP_NAME:$REACT_APP_VERSION .
+                        set -e
+
+                        # Login to ECR
                         aws ecr get-login-password | docker login --username AWS --password-stdin $AWS_DOCKER_REGISTRY
-                        docker push $AWS_DOCKER_REGISTRY/$APP_NAME:$REACT_APP_VERSION
+
+                        # Ensure buildx is available and select a builder
+                        docker buildx create --name ecs-builder --use || docker buildx use ecs-builder
+                        docker buildx inspect ecs-builder || true
+
+                        # Build *for ECS* (linux/amd64) and push in one step
+                        docker buildx build \
+                          --platform linux/amd64 \
+                          -t $AWS_DOCKER_REGISTRY/$APP_NAME:$REACT_APP_VERSION \
+                          --push \
+                          .
                     '''
                 }
             }
@@ -64,11 +76,8 @@ pipeline {
                         aws ecs update-service --cluster $AWS_ECS_CLUSTER --service $AWS_ECS_SERVICE_PROD --task-definition $AWS_ECS_TD_PROD:$LATEST_TD_REVISION
                         aws ecs wait services-stable --cluster $AWS_ECS_CLUSTER --services $AWS_ECS_SERVICE_PROD
                     '''
-                }
-                
+                }    
             }
-        }
-        
-        
+        }     
     }
 }
