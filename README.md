@@ -1,70 +1,214 @@
-# Learn Jenkins App
+# Learn Jenkins App – CI/CD with Jenkins, Docker & AWS ECS
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+This repository demonstrates a production-style CI/CD pipeline that builds a React application, packages it into a Docker image, and deploys it to AWS ECS using Jenkins.
 
-## Available Scripts
+---
 
-In the project directory, you can run:
+## Architecture Overview
 
-### `npm start`
+The pipeline is intentionally split into **CI-only tooling containers** and a **production runtime container**.
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+GitHub → Jenkins → Docker → Amazon ECR → Amazon ECS
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+## Repository Structure
 
-### `npm test`
+├── Dockerfile                     # Production image (used by ECS)
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+├── Jenkinsfile-aws                 # Main Jenkins CI/CD pipeline
 
-### `npm run build`
+├── aws/
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+│   └── task-definition-prod.json  # ECS task definition
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+├── ci/
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+│   ├── Dockerfile-aws-cli          # Jenkins CI tool image (aws, docker, jq)
 
-### `npm run eject`
+│   └── Dockerfile-playwright       # CI test image (optional)
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+├── src/                            # React application source
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+├── build/                          # Generated static build output
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+├── package.json
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+└── package-lock.json
 
-## Learn More
+## Dockerfiles Explained
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+### 1. Root Dockerfile (Production)
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+- Builds the **runtime container**
+- This image is deployed to ECS
+- Contains only what is needed to run the application
 
-### Code Splitting
+```text
+Used by: Amazon ECS
+Built by: Jenkins
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+### 2. ci/Dockerfile-aws-cli (CI Tooling)
 
-### Analyzing the Bundle Size
+- Used only inside Jenkins pipeline stages
+- Provides:
+    - AWS CLI
+    - Docker CLI
+    - jq
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+```
+Used by: Jenkins only
+Never deployed
 
-### Making a Progressive Web App
+```
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+---
 
-### Advanced Configuration
+## Jenkins Pipeline Stages
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+### Stage 1 – Build Application
 
-### Deployment
+- Runs inside `node:18-alpine`
+- Installs dependencies
+- Builds the React app
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
+```bash
+npm ci
+npm run build
 
-### `npm run build` fails to minify
+```
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+---
+
+### Stage 2 – Build & Push Docker Image
+
+- Runs inside custom `my-aws-cli` image
+- Uses Docker buildx to force `linux/amd64`
+- Pushes image to Amazon ECR
+
+```bash
+docker buildx build \
+  --platform linux/amd64 \
+  -t <ECR_REPO>:<BUILD_TAG> \
+  --push .
+
+```
+
+---
+
+### Stage 3 – Deploy to ECS
+
+- Registers a new ECS task definition revision
+- Updates ECS service
+- ECS performs rolling deployment
+
+---
+
+## ECS Deployment Model
+
+- ECS Service runs tasks from the latest task definition revision
+- Each deployment updates only the task definition (immutable infra)
+- Container logs are forwarded to CloudWatch Logs
+
+---
+
+## Platform Considerations
+
+### ARM vs AMD64
+
+The pipeline explicitly builds `linux/amd64` images to ensure compatibility with ECS runtimes.
+
+This avoids runtime errors such as:
+
+```
+exec format error
+
+```
+
+which occur when ARM images are deployed onto x86 infrastructure.
+
+---
+
+## Key Takeaways
+
+- Clear separation of CI tooling and production images
+- Immutable Docker images promoted through environments
+- ECS-native deployment process using task definitions
+- Architecture-aware Docker builds
+
+
+```
+Jenkins → Docker → ECR → ECS
+┌───────────────────────────────────────────┐
+│            GitHub Repository               │
+│                                           │
+│  ├── Jenkinsfile-aws                       │
+│  ├── Dockerfile          (PROD IMAGE) ✅  │
+│  ├── ci/                                   │
+│  │    └── Dockerfile-aws-cli (CI TOOLS)   │
+│  ├── src/                                 │
+│  ├── build/                               │
+│  └── aws/task-definition-prod.json        │
+└───────────────────────────────────────────┘
+                    │
+                    ▼
+┌───────────────────────────────────────────┐
+│                 Jenkins                   │
+│                                           │
+│  Pipeline stages run in containers         │
+│                                           │
+│  ┌───────────────┐                        │
+│  │ Stage 1       │                        │
+│  │ Build App     │                        │
+│  │               │                        │
+│  │ node:18       │  npm ci                │
+│  │ (CI only)     │  npm run build          │
+│  └───────────────┘                        │
+│          │                                │
+│          ▼                                │
+│  ┌───────────────┐                        │
+│  │ Stage 2       │                        │
+│  │ Build Image   │                        │
+│  │               │                        │
+│  │ my-aws-cli    │  docker buildx         │
+│  │ (CI only)     │  --platform amd64      │
+│  │               │  └── uses ROOT         │
+│  │               │      Dockerfile ✅     │
+│  │               │  docker push           │
+│  └───────────────┘                        │
+│          │                                │
+│          ▼                                │
+│  ┌───────────────┐                        │
+│  │ Stage 3       │                        │
+│  │ Deploy ECS    │                        │
+│  │               │                        │
+│  │ my-aws-cli    │  aws ecs               │
+│  │ (CI only)     │  register-task-def     │
+│  │               │  update-service        │
+│  └───────────────┘                        │
+└───────────────────────────────────────────┘
+                    │
+                    ▼
+┌───────────────────────────────────────────┐
+│           Amazon ECR (Registry)            │
+│                                           │
+│  learnjenkinsapp:1.0.BUILD_ID              │
+│  (linux/amd64 image) ✅                    │
+└───────────────────────────────────────────┘
+                    │
+                    ▼
+┌───────────────────────────────────────────┐
+│            Amazon ECS (Fargate)            │
+│                                           │
+│  Cluster: Learning-jenkins-app             │
+│  Service: LearnJenkinsApp-Service-Prod    │
+│                                           │
+│  Task Definition (revision N)              │
+│   ├── image from ECR ✅                    │
+│   ├── port 80                              │
+│   ├── awslogs enabled                     │
+│   └── essential container                 │
+│                                           │
+│  Runtime container starts                 │
+│  (THIS runs in production) ✅              │
+└───────────────────────────────────────────┘
+
+```
